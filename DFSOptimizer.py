@@ -17,6 +17,7 @@ import calendar
 import pymysql
 import json
 
+
 class DFS_Scraper:
 
     def __init__(self, config_file='config.txt'):
