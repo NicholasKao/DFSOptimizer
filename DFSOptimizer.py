@@ -93,7 +93,11 @@ class DFS_Scraper:
         if prop_type == 'TD Scorers':
             to_return = []
             
-            self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
+            try:
+                self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
+            except NoSuchElementException as e:
+                print('No Touchdown Scorers Posted Yet')
+                return None
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
                 for player in game.find_elements_by_class_name('component-204__outcome-row'):
@@ -424,18 +428,19 @@ if __name__ == "__main__":
     #####
     # Scrape the players and salary data from FantasyPros - only need to do once
     #####
-    scraper.navigate('salaries')
-    qbs = scraper.get_player_salary('QB')
-    rbs = scraper.get_player_salary('RB')
-    wrs = scraper.get_player_salary('WR')
-    tes = scraper.get_player_salary('TE')
-    dsts = scraper.get_player_salary('DST')
-    # Format the scraped player and salary data for joining later
-    qb_salaries = scraper.format_salary_data(qbs)
-    rb_salaries = scraper.format_salary_data(rbs)
-    wr_salaries = scraper.format_salary_data(wrs)
-    te_salaries = scraper.format_salary_data(tes)
-    dst_salaries = scraper.format_salary_data(dsts)
+    ## This part consistently works, no need to keep running it while testing
+    # scraper.navigate('salaries')
+    # qbs = scraper.get_player_salary('QB')
+    # rbs = scraper.get_player_salary('RB')
+    # wrs = scraper.get_player_salary('WR')
+    # tes = scraper.get_player_salary('TE')
+    # dsts = scraper.get_player_salary('DST')
+    # # Format the scraped player and salary data for joining later
+    # qb_salaries = scraper.format_salary_data(qbs)
+    # rb_salaries = scraper.format_salary_data(rbs)
+    # wr_salaries = scraper.format_salary_data(wrs)
+    # te_salaries = scraper.format_salary_data(tes)
+    # dst_salaries = scraper.format_salary_data(dsts)
     
     # get a list of games to help format different datasets for joining
     #games = scraper.get_games(dst_salaries)
