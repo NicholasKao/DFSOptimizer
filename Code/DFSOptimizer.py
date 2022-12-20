@@ -100,12 +100,6 @@ class DFS_Scraper:
                     player_name = player.find_element_by_class_name('component-204__outcome-label').text
                     td_odds = player.find_element_by_class_name('sportsbook-odds.american.no-margin.default-color').text
                     to_return.append((json.loads(game_data)['value'], player_name, td_odds))
-                if len(to_return) == 0: # happens when there is a live game going on
-                    players = game.find_elements_by_class_name('component-204-horizontal__outcome-row')
-                    for player in players:
-                        player_name = player.find_element_by_class_name('component-204-horizontal__outcome-label').text
-                        td_odds = player.find_element_by_class_name('component-204-horizontal__cell').text
-                        to_return.append((json.loads(game_data)['value'], player_name, td_odds))
                     
             return(pd.DataFrame(data = {'Game': [x[0] for x in to_return],
                                         'Player': [x[1] for x in to_return],
@@ -479,9 +473,4 @@ if __name__ == "__main__":
     te_data = scraper.combine_data(te_salaries, expected_props_points, te_projections)
     #dst_data = scraper.combine_data(dst_salaries, None, def_projections) won't work how I currently have set up - need to be able to get a list of games
     scraper.quit()
-
-    qb_data.to_csv(f'../Output/qb_data_{dt.now().date()}.csv')
-    rb_data.to_csv(f'../Output/rb_data_{dt.now().date()}.csv')
-    wr_data.to_csv(f'../Output/wr_data_{dt.now().date()}.csv')
-    te_data.to_csv(f'../Output/te_data_{dt.now().date()}.csv')
     
