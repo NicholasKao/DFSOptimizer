@@ -192,7 +192,11 @@ class DFS_Scraper:
                     tds = player.find_elements_by_class_name('sportsbook-outcome-cell__line')[0].text
                     rec_yards.append((json.loads(game_data)['value'], player_name, tds))
             
-            self.browser.find_element_by_id('subcategory_Receptions').click()
+            try:
+                self.browser.find_element_by_id('subcategory_Receptions').click()
+            except NoSuchElementException as e:
+                print('No Receptions Props Posted Yet')
+                return None
             time.sleep(1)
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
@@ -217,12 +221,15 @@ class DFS_Scraper:
             
     def combine_props(self, td_odds, passing_info, rush_rec_info):
         # Do some calculations to prep for aggreagting expected production
-        td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
-        passing_info['ExpectedTdPasses'] = passing_info.apply(
-            lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
-        passing_info['ExpectedInts'] = passing_info.apply(
-            lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
-        rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
+        if td_odds:
+            td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
+        if passing_info:
+            passing_info['ExpectedTdPasses'] = passing_info.apply(
+                lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
+            passing_info['ExpectedInts'] = passing_info.apply(
+                lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
+        if rush_rec_info:
+            rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
             lambda row: expected_production(row['Receptions'], row['Receptions Over Juice']), axis = 1)
         
         expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
