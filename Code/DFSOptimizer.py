@@ -93,13 +93,23 @@ class DFS_Scraper:
         if prop_type == 'TD Scorers':
             to_return = []
             
-            self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
+            try:
+                self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
+            except NoSuchElementException as e:
+                print('No Touchdown Scorers Posted Yet')
+                return None
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
                 for player in game.find_elements_by_class_name('component-204__outcome-row'):
                     player_name = player.find_element_by_class_name('component-204__outcome-label').text
                     td_odds = player.find_element_by_class_name('sportsbook-odds.american.no-margin.default-color').text
                     to_return.append((json.loads(game_data)['value'], player_name, td_odds))
+                if len(to_return) == 0: # happens when there is a live game going on
+                    players = game.find_elements_by_class_name('component-204-horizontal__outcome-row')
+                    for player in players:
+                        player_name = player.find_element_by_class_name('component-204-horizontal__outcome-label').text
+                        td_odds = player.find_element_by_class_name('component-204-horizontal__cell').text
+                        to_return.append((json.loads(game_data)['value'], player_name, td_odds))
                     
             return(pd.DataFrame(data = {'Game': [x[0] for x in to_return],
                                         'Player': [x[1] for x in to_return],
@@ -182,7 +192,11 @@ class DFS_Scraper:
                     tds = player.find_elements_by_class_name('sportsbook-outcome-cell__line')[0].text
                     rec_yards.append((json.loads(game_data)['value'], player_name, tds))
             
-            self.browser.find_element_by_id('subcategory_Receptions').click()
+            try:
+                self.browser.find_element_by_id('subcategory_Receptions').click()
+            except NoSuchElementException as e:
+                print('No Receptions Props Posted Yet')
+                return None
             time.sleep(1)
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
@@ -207,20 +221,37 @@ class DFS_Scraper:
             
     def combine_props(self, td_odds, passing_info, rush_rec_info):
         # Do some calculations to prep for aggreagting expected production
-        td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
-        passing_info['ExpectedTdPasses'] = passing_info.apply(
-            lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
-        passing_info['ExpectedInts'] = passing_info.apply(
-            lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
-        rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
+        if td_odds and not td_odds.empty:
+            td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
+        if not passing_info.empty:
+            passing_info['ExpectedTdPasses'] = passing_info.apply(
+                lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
+            passing_info['ExpectedInts'] = passing_info.apply(
+                lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
+        if rush_rec_info and not rush_rec_info.empty:
+            rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
             lambda row: expected_production(row['Receptions'], row['Receptions Over Juice']), axis = 1)
         
-        expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
-        
-        expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
-        expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
-        expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
-        
+        if (not passing_info.empty) and  (rush_rec_info and not rush_rec_info.empty) and (not td_odds.empty):
+            expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+            expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
+            expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
+        elif (not passing_info.empty) and (rush_rec_info and not rush_rec_info.empty):
+            expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+            expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
+            expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
+        elif (not passing_info.empty) and (td_odds and not td_odds.empty):
+            expected_player_output = passing_info.merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+        elif not passing_info.empty:
+            expected_player_output = passing_info
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+        else:
+            return None
+
+
         expected_player_output['PredictedPropsBasedScore'] = expected_player_output.apply(lambda row: calculate_points(row), axis = 1)
         
         # reformat the game data so that it aligns with the salary data 
@@ -394,7 +425,37 @@ def expected_production(line, odds):
     return(line + additional_production)
 
 def calculate_points(row):
-    return(np.nansum([(6*row['ProbToScore']), (4*row['ExpectedTdPasses']), (-1*row['ExpectedInts']), (row['Passing Yards']/25), (row['Rushing Yards']/10), (row['Rec Yards']/10),row['ExpectedRecs']]))
+
+    try:
+        td_points  = 6*row['ProbToScore']
+    except KeyError as e:
+        td_points = 0
+    try:
+        td_pass_points = 4*row['ExpectedTdPasses']
+    except:
+        td_pass_pints = 0
+    try:
+        int_points = -1*row['ExpectedInts']
+    except:
+        int_points = 0
+    try:
+        pass_yards_points = row['Passing Yards']/25
+    except:
+        pass_yards_points = 0
+    try:
+        rush_yards_points = row['Rushing Yards']/10
+    except:
+        rush_yards_points = 0
+    try:
+        rec_yards_points = row['Rec Yards']/10
+    except:
+        rec_yards_points = 0
+    try:
+        recs_points = row['ExpectedRecs']
+    except:
+        recs_points = 0
+
+    return np.nansum([td_points, td_pass_points, int_points, pass_yards_points, rush_yards_points, rec_yards_points, recs_points])
 
 def get_games(df):
     games = df[['Game']]
@@ -418,6 +479,7 @@ if __name__ == "__main__":
     #####
     # Scrape the players and salary data from FantasyPros - only need to do once
     #####
+
     scraper.navigate('salaries')
     qbs = scraper.get_player_salary('QB')
     rbs = scraper.get_player_salary('RB')
@@ -429,10 +491,7 @@ if __name__ == "__main__":
     rb_salaries = scraper.format_salary_data(rbs)
     wr_salaries = scraper.format_salary_data(wrs)
     te_salaries = scraper.format_salary_data(tes)
-    dst_salaries = scraper.format_salary_data(dsts)
-    
-    # get a list of games to help format different datasets for joining
-    #games = scraper.get_games(dst_salaries)
+    dst_salaries = scraper.format_salary_data(dsts)    
     
     
     #####
@@ -473,4 +532,9 @@ if __name__ == "__main__":
     te_data = scraper.combine_data(te_salaries, expected_props_points, te_projections)
     #dst_data = scraper.combine_data(dst_salaries, None, def_projections) won't work how I currently have set up - need to be able to get a list of games
     scraper.quit()
+
+    qb_data.to_csv(f'../Output/qb_data_{dt.now().date()}.csv')
+    rb_data.to_csv(f'../Output/rb_data_{dt.now().date()}.csv')
+    wr_data.to_csv(f'../Output/wr_data_{dt.now().date()}.csv')
+    te_data.to_csv(f'../Output/te_data_{dt.now().date()}.csv')
     
