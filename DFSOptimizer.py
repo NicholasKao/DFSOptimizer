@@ -221,23 +221,37 @@ class DFS_Scraper:
             
     def combine_props(self, td_odds, passing_info, rush_rec_info):
         # Do some calculations to prep for aggreagting expected production
-        if td_odds:
+        if td_odds and not td_odds.empty:
             td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
-        if passing_info:
+        if not passing_info.empty:
             passing_info['ExpectedTdPasses'] = passing_info.apply(
                 lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
             passing_info['ExpectedInts'] = passing_info.apply(
                 lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
-        if rush_rec_info:
+        if rush_rec_info and not rush_rec_info.empty:
             rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
             lambda row: expected_production(row['Receptions'], row['Receptions Over Juice']), axis = 1)
         
-        expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
-        
-        expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
-        expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
-        expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
-        
+        if (not passing_info.empty) and  (rush_rec_info and not rush_rec_info.empty) and (not td_odds.empty):
+            expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+            expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
+            expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
+        elif (not passing_info.empty) and (rush_rec_info and not rush_rec_info.empty):
+            expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+            expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
+            expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
+        elif (not passing_info.empty) and (td_odds and not td_odds.empty):
+            expected_player_output = passing_info.merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+        elif not passing_info.empty:
+            expected_player_output = passing_info
+            expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
+        else:
+            return None
+
+
         expected_player_output['PredictedPropsBasedScore'] = expected_player_output.apply(lambda row: calculate_points(row), axis = 1)
         
         # reformat the game data so that it aligns with the salary data 
@@ -411,7 +425,37 @@ def expected_production(line, odds):
     return(line + additional_production)
 
 def calculate_points(row):
-    return(np.nansum([(6*row['ProbToScore']), (4*row['ExpectedTdPasses']), (-1*row['ExpectedInts']), (row['Passing Yards']/25), (row['Rushing Yards']/10), (row['Rec Yards']/10),row['ExpectedRecs']]))
+
+    try:
+        td_points  = 6*row['ProbToScore']
+    except KeyError as e:
+        td_points = 0
+    try:
+        td_pass_points = 4*row['ExpectedTdPasses']
+    except:
+        td_pass_pints = 0
+    try:
+        int_points = -1*row['ExpectedInts']
+    except:
+        int_points = 0
+    try:
+        pass_yards_points = row['Passing Yards']/25
+    except:
+        pass_yards_points = 0
+    try:
+        rush_yards_points = row['Rushing Yards']/10
+    except:
+        rush_yards_points = 0
+    try:
+        rec_yards_points = row['Rec Yards']/10
+    except:
+        rec_yards_points = 0
+    try:
+        recs_points = row['ExpectedRecs']
+    except:
+        recs_points = 0
+
+    return np.nansum([td_points, td_pass_points, int_points, pass_yards_points, rush_yards_points, rec_yards_points, recs_points])
 
 def get_games(df):
     games = df[['Game']]
