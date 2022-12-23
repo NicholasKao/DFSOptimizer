@@ -532,8 +532,8 @@ if __name__ == "__main__":
     #dst_data = scraper.combine_data(dst_salaries, None, def_projections) won't work how I currently have set up - need to be able to get a list of games
     scraper.quit()
 
-    qb_data.to_csv(f'../Output/qb_data_{dt.now().date()}.csv')
-    rb_data.to_csv(f'../Output/rb_data_{dt.now().date()}.csv')
-    wr_data.to_csv(f'../Output/wr_data_{dt.now().date()}.csv')
-    te_data.to_csv(f'../Output/te_data_{dt.now().date()}.csv')
+    qb_data.to_csv(f'Output/qb_data_{dt.now().date()}.csv')
+    rb_data.to_csv(f'Output/rb_data_{dt.now().date()}.csv')
+    wr_data.to_csv(f'Output/wr_data_{dt.now().date()}.csv')
+    te_data.to_csv(f'Output/te_data_{dt.now().date()}.csv')
     
