@@ -221,28 +221,28 @@ class DFS_Scraper:
             
     def combine_props(self, td_odds, passing_info, rush_rec_info):
         # Do some calculations to prep for aggreagting expected production
-        if td_odds and not td_odds.empty:
+        if not td_odds.empty:
             td_odds['ProbToScore'] = td_odds.apply(lambda row: implied_prob(row['TD Odds']), axis = 1)
         if not passing_info.empty:
             passing_info['ExpectedTdPasses'] = passing_info.apply(
                 lambda row: expected_production(row['Passing TDs'], row['TD Over Juice']), axis = 1)
             passing_info['ExpectedInts'] = passing_info.apply(
                 lambda row: expected_production(row['INTs'], row['INTs Over Juice']), axis = 1)
-        if rush_rec_info and not rush_rec_info.empty:
+        if not rush_rec_info.empty:
             rush_rec_info['ExpectedRecs'] = rush_rec_info.apply(
             lambda row: expected_production(row['Receptions'], row['Receptions Over Juice']), axis = 1)
         
-        if (not passing_info.empty) and  (rush_rec_info and not rush_rec_info.empty) and (not td_odds.empty):
+        if not passing_info.empty and not rush_rec_info.empty and not td_odds.empty:
             expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player']).merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
             expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
             expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
             expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
-        elif (not passing_info.empty) and (rush_rec_info and not rush_rec_info.empty):
+        elif not passing_info.empty and not rush_rec_info.empty:
             expected_player_output = passing_info.merge(rush_rec_info, how = 'outer', on = ['Game','Player'])
             expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
             expected_player_output['Rushing Yards'] = pd.to_numeric(expected_player_output['Rushing Yards'])
             expected_player_output['Rec Yards'] = pd.to_numeric(expected_player_output['Rec Yards'])
-        elif (not passing_info.empty) and (td_odds and not td_odds.empty):
+        elif not passing_info.empty and not td_odds.empty:
             expected_player_output = passing_info.merge(td_odds, how = 'left', on = ['Game','Player']).sort_values(['Game', 'Player'])
             expected_player_output['Passing Yards'] = pd.to_numeric(expected_player_output['Passing Yards'])
         elif not passing_info.empty:
