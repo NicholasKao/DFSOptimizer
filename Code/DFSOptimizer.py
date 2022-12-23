@@ -92,24 +92,27 @@ class DFS_Scraper:
                 
         if prop_type == 'TD Scorers':
             to_return = []
+            prev_len = 0
+            curr_len = 0
             
-            try:
-                self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
-            except NoSuchElementException as e:
-                print('No Touchdown Scorers Posted Yet')
-                return None
+            self.browser.find_element_by_id('subcategory_Anytime TD Scorer').click()
+            games = self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded')
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
-                for player in game.find_elements_by_class_name('component-204__outcome-row'):
+                players = game.find_elements_by_class_name('component-204__outcome-row')
+                for player in players:
                     player_name = player.find_element_by_class_name('component-204__outcome-label').text
                     td_odds = player.find_element_by_class_name('sportsbook-odds.american.no-margin.default-color').text
                     to_return.append((json.loads(game_data)['value'], player_name, td_odds))
-                if len(to_return) == 0: # happens when there is a live game going on
+                    curr_len += 1
+                if len(to_return) == prev_len:
                     players = game.find_elements_by_class_name('component-204-horizontal__outcome-row')
                     for player in players:
                         player_name = player.find_element_by_class_name('component-204-horizontal__outcome-label').text
                         td_odds = player.find_element_by_class_name('component-204-horizontal__cell').text
                         to_return.append((json.loads(game_data)['value'], player_name, td_odds))
+                        curr_len += 1
+                prev_len = curr_len
                     
             return(pd.DataFrame(data = {'Game': [x[0] for x in to_return],
                                         'Player': [x[1] for x in to_return],
@@ -192,11 +195,7 @@ class DFS_Scraper:
                     tds = player.find_elements_by_class_name('sportsbook-outcome-cell__line')[0].text
                     rec_yards.append((json.loads(game_data)['value'], player_name, tds))
             
-            try:
-                self.browser.find_element_by_id('subcategory_Receptions').click()
-            except NoSuchElementException as e:
-                print('No Receptions Props Posted Yet')
-                return None
+            self.browser.find_element_by_id('subcategory_Receptions').click()
             time.sleep(1)
             for game in self.browser.find_elements_by_class_name('sportsbook-event-accordion__wrapper.expanded'):
                 game_data = game.find_element_by_class_name('sportsbook-event-accordion__accordion').get_attribute('data-tracking')
